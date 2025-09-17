@@ -1,0 +1,41 @@
+name: Deploy Compose Bundle
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build bundle
+        run: |
+          set -eux
+          mkdir -p dist
+          zip -r dist/bundle.zip compose/production traefik portainer cloudflared \
+            -x '**/.DS_Store' '**/.git*'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/github-oidc-deploy
+          aws-region: eu-west-1
+
+      - name: Upload to S3
+        run: |
+          KEY="bundles/platform-$(date +%Y%m%d-%H%M%S).zip"
+          aws s3 cp dist/bundle.zip s3://$BUNDLE_BUCKET/$KEY
+          echo "KEY=$KEY" >> $GITHUB_ENV
+
+      - name: Update SSM parameter
+        run: |
+          aws ssm put-parameter --name /platform/compose_key --type String --value "$KEY" --overwrite
+
+      - name: Start Instance Refresh
+        run: |
+          aws autoscaling start-instance-refresh --auto-scaling-group-name "<AsgName>" \
+            --preferences "MinHealthyPercentage=100,InstanceWarmup=120"

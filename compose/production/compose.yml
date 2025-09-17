@@ -1,0 +1,66 @@
+
+networks:
+  edge:
+  apps:
+
+volumes:
+  portainer_data:
+  traefik_data:
+
+services:
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.dashboard.address=:8081
+      - --serverstransport.insecureskipverify=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --accesslog=true
+      - --log.level=INFO
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.johntech.net`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure,dashboard"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
+      - "traefik.http.routers.dashboard.entrypoints=dashboard"
+      - "traefik.http.routers.dashboard.service=api@internal"
+    ports:
+      - "8081:8081"
+    volumes:
+      - /run/podman/podman.sock:/var/run/docker.sock:ro,Z
+      - traefik_data:/etc/traefik
+    networks: [edge, apps]
+    restart: unless-stopped
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.johntech.net`)"
+      - "traefik.http.routers.portainer.entrypoints=web"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    ports:
+      - "9000:9000"
+    networks: [apps]
+    environment:
+      - TRUSTED_ORIGINS=portainer.johntech.net
+      - EDGE=1
+    restart: unless-stopped
+
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    networks: [edge]
