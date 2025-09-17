@@ -1,1 +1,13 @@
+# Ignore generated cloudflared config files
+apps-platform/compose/production/cloudflared-config/config-local.yml
+apps-platform/compose/production/cloudflared-config/config-prod.yml
 bundle.zip
+compose/production/cloudflared-config/config-local.yml
+compose/production/cloudflared-config/config-prod.yml
+compose/production/cloudflared-config/config-local.yml.bak
+compose/production/cloudflared-config/*.json
+
+# Ignore environment config
+/environments.json
+compose/production/.env
+compose/production/.env.local

@@ -1,4 +1,3 @@
-
 networks:
   edge:
   apps:
@@ -23,7 +22,7 @@ services:
       - --log.level=INFO
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.johntech.net`)"
+      - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOSTNAME}`)"
       - "traefik.http.routers.traefik.entrypoints=websecure,dashboard"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
@@ -45,22 +44,30 @@ services:
       - portainer_data:/data
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(`portainer.johntech.net`)"
+      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_HOSTNAME}`)"
       - "traefik.http.routers.portainer.entrypoints=web"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
     ports:
       - "9000:9000"
     networks: [apps]
     environment:
-      - TRUSTED_ORIGINS=portainer.johntech.net
+      - TRUSTED_ORIGINS=${PORTAINER_HOSTNAME}
       - EDGE=1
     restart: unless-stopped
-
 
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel run
     environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     restart: unless-stopped
     networks: [edge]
+
+  debug:
+    image: ubuntu:22.04
+    command: sleep infinity
+    tty: true
+    stdin_open: true
+    networks:
+      - edge
+      - apps
