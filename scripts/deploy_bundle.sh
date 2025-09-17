@@ -1,3 +1,5 @@
+OAUTH_WHITELIST_DOMAIN=$(get_json oauth_whitelist_domain)
+echo "OAUTH_WHITELIST_DOMAIN=$OAUTH_WHITELIST_DOMAIN" >> "$ENV_FILE"
 #!/bin/bash
 set -euxo pipefail
 
@@ -32,6 +34,10 @@ TUNNEL_ID=$(get_json tunnel_id)
 TRAEFIK_HOSTNAME=$(get_json traefik_hostname)
 PORTAINER_HOSTNAME=$(get_json portainer_hostname)
 DOCKER_SOCKET_PATH=$(get_json docker_socket_path)
+GITHUB_CLIENT_ID_PROD=$(get_json github_client_id_prod)
+GITHUB_CLIENT_SECRET_PROD=$(get_json github_client_secret_prod)
+OAUTH2_COOKIE_SECRET_PROD=$(get_json oauth2_cookie_secret_prod)
+OAUTH_URL=$(get_json oauth_url)
 ASG=$(get_json asg)
 BUCKET=$(get_json bucket)
 REGION=$(get_json region)
@@ -44,6 +50,10 @@ echo "TRAEFIK_HOSTNAME=$TRAEFIK_HOSTNAME" >> "$ENV_FILE"
 echo "TUNNEL_ID=$TUNNEL_ID" >> "$ENV_FILE"
 echo "PORTAINER_HOSTNAME=$PORTAINER_HOSTNAME" >> "$ENV_FILE"
 echo "DOCKER_SOCKET_PATH=$DOCKER_SOCKET_PATH" >> "$ENV_FILE"
+echo "GITHUB_CLIENT_ID_PROD=$GITHUB_CLIENT_ID_PROD" >> "$ENV_FILE"
+echo "GITHUB_CLIENT_SECRET_PROD=$GITHUB_CLIENT_SECRET_PROD" >> "$ENV_FILE"
+echo "OAUTH2_COOKIE_SECRET_PROD=$OAUTH2_COOKIE_SECRET_PROD" >> "$ENV_FILE"
+echo "OAUTH_URL=$OAUTH_URL" >> "$ENV_FILE"
 
 if [ "$ENVIRONMENT" = "cloud" ]; then
     # Cloud: just build the bundle
@@ -61,6 +71,7 @@ if [ "$ENVIRONMENT" = "cloud" ]; then
     exit 0
 else
     # Local/dev: run compose with env file
+    $DOCKER_COMPOSE --env-file "$ENV_FILE" down -v --remove-orphans --timeout 10 || true
     $DOCKER_COMPOSE --env-file "$ENV_FILE" pull
     $DOCKER_COMPOSE --env-file "$ENV_FILE" up -d --force-recreate
     echo "Stack deployed for $ENVIRONMENT."
