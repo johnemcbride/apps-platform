@@ -1,5 +1,4 @@
-OAUTH_WHITELIST_DOMAIN=$(get_json oauth_whitelist_domain)
-echo "OAUTH_WHITELIST_DOMAIN=$OAUTH_WHITELIST_DOMAIN" >> "$ENV_FILE"
+
 #!/bin/bash
 set -euxo pipefail
 
@@ -54,6 +53,8 @@ echo "GITHUB_CLIENT_ID_PROD=$GITHUB_CLIENT_ID_PROD" >> "$ENV_FILE"
 echo "GITHUB_CLIENT_SECRET_PROD=$GITHUB_CLIENT_SECRET_PROD" >> "$ENV_FILE"
 echo "OAUTH2_COOKIE_SECRET_PROD=$OAUTH2_COOKIE_SECRET_PROD" >> "$ENV_FILE"
 echo "OAUTH_URL=$OAUTH_URL" >> "$ENV_FILE"
+OAUTH_WHITELIST_DOMAIN=$(get_json oauth_whitelist_domain)
+echo "OAUTH_WHITELIST_DOMAIN=$OAUTH_WHITELIST_DOMAIN" >> "$ENV_FILE"
 
 if [ "$ENVIRONMENT" = "cloud" ]; then
     # Cloud: just build the bundle
