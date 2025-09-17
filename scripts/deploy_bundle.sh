@@ -26,10 +26,12 @@ get_json() {
     jq -r ".${ENVIRONMENT}.$1" "$CONFIG_FILE"
 }
 
+
 TUNNEL_TOKEN=$(get_json tunnel_token)
 TUNNEL_ID=$(get_json tunnel_id)
 TRAEFIK_HOSTNAME=$(get_json traefik_hostname)
 PORTAINER_HOSTNAME=$(get_json portainer_hostname)
+DOCKER_SOCKET_PATH=$(get_json docker_socket_path)
 ASG=$(get_json asg)
 BUCKET=$(get_json bucket)
 REGION=$(get_json region)
@@ -41,6 +43,7 @@ echo "TUNNEL_TOKEN=$TUNNEL_TOKEN" > "$ENV_FILE"
 echo "TRAEFIK_HOSTNAME=$TRAEFIK_HOSTNAME" >> "$ENV_FILE"
 echo "TUNNEL_ID=$TUNNEL_ID" >> "$ENV_FILE"
 echo "PORTAINER_HOSTNAME=$PORTAINER_HOSTNAME" >> "$ENV_FILE"
+echo "DOCKER_SOCKET_PATH=$DOCKER_SOCKET_PATH" >> "$ENV_FILE"
 
 if [ "$ENVIRONMENT" = "cloud" ]; then
     # Cloud: just build the bundle

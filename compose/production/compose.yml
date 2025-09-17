@@ -31,7 +31,7 @@ services:
     ports:
       - "8081:8081"
     volumes:
-      - /run/podman/podman.sock:/var/run/docker.sock:ro,Z
+      - ${DOCKER_SOCKET_PATH:-/run/podman/podman.sock}:/var/run/docker.sock:ro,Z
       - traefik_data:/etc/traefik
     networks: [edge, apps]
     restart: unless-stopped
