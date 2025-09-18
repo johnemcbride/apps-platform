@@ -35,7 +35,7 @@ services:
         OAUTH2_PROXY_COOKIE_SECURE: "true"
         OAUTH2_PROXY_REVERSE_PROXY: "true"
         OAUTH2_PROXY_COOKIE_NAME: _oauth2_proxy_prod
-        OAUTH2_WHITELIST_DOMAIN: ${OAUTH_WHITELIST_DOMAIN}
+        OAUTH2_PROXY_WHITELIST_DOMAIN: ${OAUTH_WHITELIST_DOMAIN}
         OAUTH2_PROXY_COOKIE_DOMAIN: ${OAUTH_WHITELIST_DOMAIN}
       networks: [apps]
       restart: unless-stopped
@@ -67,7 +67,7 @@ services:
       - "traefik.http.routers.dashboard.entrypoints=dashboard"
       - "traefik.http.routers.dashboard.service=api@internal"
        #  forward-auth → oauth2-proxy
-      - traefik.http.middlewares.oauth2auth.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth
+      - traefik.http.middlewares.oauth2auth.forwardauth.address=https://${OAUTH_URL}/oauth2/auth
       - traefik.http.middlewares.oauth2auth.forwardauth.trustForwardHeader=true
       - traefik.http.middlewares.oauth2auth.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email,Authorization
          # 401 → redirector
@@ -105,8 +105,6 @@ services:
       - "traefik.http.routers.portainer.entrypoints=web"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
       - traefik.http.routers.portainer.middlewares=forwarded-headers,oauth2auth,auth-errors,secure-headers
-    ports:
-      - "9000:9000"
     networks: [apps]
     environment:
       - TRUSTED_ORIGINS=${PORTAINER_HOSTNAME}
