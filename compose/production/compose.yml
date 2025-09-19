@@ -29,13 +29,15 @@ services:
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
       OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"   # optional
       OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "false"
+      OAUTH2_PROXY_SHOW_DEBUG_ON_ERROR: "true"
+      LOG_LEVEL: "debug"
     networks: [apps]
     restart: unless-stopped
     labels:
       - traefik.enable=true
-      - traefik.http.routers.oauth2.rule=Host(`${OAUTH_URL}`)
-      - traefik.http.routers.oauth2.entrypoints=web
-      - traefik.http.services.oauth2.loadbalancer.server.port=4180
+      - "traefik.http.routers.oauth2-proxy.rule=Host(`${OAUTH_URL}`)"
+      - "traefik.http.routers.oauth2-proxy.entrypoints=web"
+      - "traefik.http.services.oauth2-proxy.loadbalancer.server.port=4180"
         
   traefik:
     image: traefik:v3.1
@@ -58,29 +60,19 @@ services:
       - "traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
       - "traefik.http.routers.dashboard.entrypoints=dashboard"
       - "traefik.http.routers.dashboard.service=api@internal"
-       #  forward-auth → oauth2-proxy
-      - traefik.http.middlewares.oauth2auth.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth
-      - traefik.http.middlewares.oauth2auth.forwardauth.trustForwardHeader=true
-      - traefik.http.middlewares.oauth2auth.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email,Authorization
-      
-      # optional: treat requests as https behind Cloudflare
-      - traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Proto=https
-      - traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Host={host}
-      - traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Port=443
-
-       # Security headers (this is the one your router is referencing)
-      - traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000
-      - traefik.http.middlewares.secure-headers.headers.browserXssFilter=true
-      - traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true
-      - traefik.http.middlewares.secure-headers.headers.frameDeny=true
-
-      # Catch both 401 and 403 from forwardAuth and send to oauth2-proxy's start
-      - traefik.http.middlewares.auth-errors.errors.status=401-403
-      - traefik.http.middlewares.auth-errors.errors.service=oauth2@docker 
-      # Keep the rd simple first; once working, you can make it dynamic
-      - traefik.http.middlewares.auth-errors.errors.query=https://${OAUTH_URL}/oauth2/start?rd={url}
-
-      - traefik.http.routers.dashboard.middlewares=forwarded-headers,oauth2auth,auth-errors,secure-headers
+      - "traefik.http.middlewares.oauth2auth.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth"
+      - "traefik.http.middlewares.oauth2auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.oauth2auth.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email,Authorization"
+      - "traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Host={host}"
+      - "traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Port=443"
+      - "traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.secure-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.secure-headers.headers.frameDeny=true"
+  - "traefik.http.middlewares.auth-errors.errors.status=401-403"
+  - "traefik.http.middlewares.auth-errors.errors.query=https://${OAUTH_URL}/oauth2/start?rd={url}"
+      - "traefik.http.routers.dashboard.middlewares=forwarded-headers,oauth2auth,auth-errors,secure-headers"
      
     ports:
       - "8081:8081"
@@ -90,25 +82,42 @@ services:
     networks: [edge, apps]
     restart: unless-stopped
 
-  portainer:
-    image: portainer/portainer-ce:latest
-    command: -H unix:///var/run/docker.sock
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
+  # portainer:
+  #   image: portainer/portainer-ce:latest
+  #   command: -H unix:///var/run/docker.sock
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - portainer_data:/data
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_HOSTNAME}`)"
+  #     - "traefik.http.routers.portainer.entrypoints=web"
+  #     - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+  #     - traefik.http.routers.portainer.middlewares=forwarded-headers,oauth2auth,auth-errors,secure-headers
+     
+  #   networks: [apps]
+  #   environment:
+  #     - TRUSTED_ORIGINS=${PORTAINER_HOSTNAME}
+  #     - EDGE=1
+  #   restart: unless-stopped
+
+  repository:
+    image: containous/whoami
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_HOSTNAME}`)"
-      - "traefik.http.routers.portainer.entrypoints=web"
-      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
-      - traefik.http.routers.portainer.middlewares=forwarded-headers,oauth2auth,auth-errors,secure-headers
-     
-    networks: [apps]
-    environment:
-      - TRUSTED_ORIGINS=${PORTAINER_HOSTNAME}
-      - EDGE=1
-    restart: unless-stopped
+      # Oauth connector
+      - "traefik.http.routers.nexus.rule=Host(`${PORTAINER_HOSTNAME}`)"
+      - "traefik.http.routers.nexus.entrypoints=web"
+      - "traefik.http.routers.nexus.tls=false"
+      - "traefik.http.routers.nexus.service=nexus"
+      - "traefik.http.routers.nexus.priority=10"
+      - "traefik.http.services.nexus.loadbalancer.server.port=80"
+      - "traefik.http.routers.nexus.middlewares=nexus-forward-auth"
+      - "traefik.http.middlewares.nexus-forward-auth.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth"
+      - "traefik.http.middlewares.nexus-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Email,X-Forwarded-Preferred-Username,X-Forwarded-Groups,X-Auth-Request-Access-Token,Authorization"
+      - "traefik.http.middlewares.nexus-forward-auth.forwardauth.trustForwardHeader=true"
 
+    networks: [apps]
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel run
