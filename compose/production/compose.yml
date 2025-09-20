@@ -7,37 +7,7 @@ volumes:
   traefik_data:
 
 services:
-  oauth2-proxy:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
-    environment:
-      OAUTH2_PROXY_PROVIDER: github
-      OAUTH2_PROXY_CLIENT_ID: ${GITHUB_CLIENT_ID_PROD}
-      OAUTH2_PROXY_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET_PROD}
-      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET_PROD}   # 32-byte base64
-      OAUTH2_PROXY_EMAIL_DOMAINS: '*'                            # or restrict (see below)
-      # Restrict by org/team (optional):
-      # OAUTH2_PROXY_GITHUB_ORG: your-org
-      # OAUTH2_PROXY_GITHUB_TEAM: your-org:platform
-      OAUTH2_PROXY_UPSTREAMS: file:///dev/null
-      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
-      OAUTH2_PROXY_REDIRECT_URL: https://${OAUTH_URL}/oauth2/callback
-      OAUTH2_PROXY_COOKIE_SECURE: "true"
-      OAUTH2_PROXY_REVERSE_PROXY: "true"
-      OAUTH2_PROXY_COOKIE_NAME: _oauth2_proxy_prod
-      OAUTH2_PROXY_WHITELIST_DOMAINS: ${OAUTH_WHITELIST_DOMAIN}
-      OAUTH2_PROXY_COOKIE_DOMAINS: ${OAUTH_WHITELIST_DOMAIN}
-      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
-      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"   # optional
-      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "false"
-      OAUTH2_PROXY_SHOW_DEBUG_ON_ERROR: "true"
-      LOG_LEVEL: "debug"
-    networks: [apps]
-    restart: unless-stopped
-    labels:
-      - traefik.enable=true
-      - "traefik.http.routers.oauth2-proxy.rule=Host(`${OAUTH_URL}`)"
-      - "traefik.http.routers.oauth2-proxy.entrypoints=web"
-      - "traefik.http.services.oauth2-proxy.loadbalancer.server.port=4180"
+
         
   traefik:
     image: traefik:v3.1
@@ -66,13 +36,16 @@ services:
       - "traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Host={host}"
       - "traefik.http.middlewares.forwarded-headers.headers.customrequestheaders.X-Forwarded-Port=443"
-      - "traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000"
-      - "traefik.http.middlewares.secure-headers.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.secure-headers.headers.frameDeny=true"
-  - "traefik.http.middlewares.auth-errors.errors.status=401-403"
-  - "traefik.http.middlewares.auth-errors.errors.query=https://${OAUTH_URL}/oauth2/start?rd={url}"
-      - "traefik.http.routers.dashboard.middlewares=forwarded-headers,oauth2auth,auth-errors,secure-headers"
+      #- "traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000"
+      # - "traefik.http.middlewares.secure-headers.headers.browserXssFilter=true"
+      # - "traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true"
+      # - "traefik.http.middlewares.secure-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.auth-errors.errors.status=401-403"
+      - "traefik.http.middlewares.auth-errors.errors.service=oauth2"
+      - "traefik.http.middlewares.auth-errors.errors.query=/oauth2/sign_in?rd={url}"
+      #- "traefik.http.middlewares.auth-errors.errors.query=http://www.google.co.uk"
+      
+      #- "traefik.http.routers.dashboard.middlewares=forwarded-headers,oauth2auth,auth-errors,secure-headers"
      
     ports:
       - "8081:8081"
@@ -108,14 +81,11 @@ services:
       # Oauth connector
       - "traefik.http.routers.nexus.rule=Host(`${PORTAINER_HOSTNAME}`)"
       - "traefik.http.routers.nexus.entrypoints=web"
-      - "traefik.http.routers.nexus.tls=false"
-      - "traefik.http.routers.nexus.service=nexus"
-      - "traefik.http.routers.nexus.priority=10"
       - "traefik.http.services.nexus.loadbalancer.server.port=80"
-      - "traefik.http.routers.nexus.middlewares=nexus-forward-auth"
-      - "traefik.http.middlewares.nexus-forward-auth.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth"
-      - "traefik.http.middlewares.nexus-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Email,X-Forwarded-Preferred-Username,X-Forwarded-Groups,X-Auth-Request-Access-Token,Authorization"
-      - "traefik.http.middlewares.nexus-forward-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.nexus.middlewares=forwarded-headers,auth-errors,oauth2auth"
+      # - "traefik.http.middlewares.nexus-forward-auth.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth"
+      # - "traefik.http.middlewares.nexus-forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Email,X-Forwarded-Preferred-Username,X-Forwarded-Groups,X-Auth-Request-Access-Token,Authorization"
+      # - "traefik.http.middlewares.nexus-forward-auth.forwardauth.trustForwardHeader=true"
 
     networks: [apps]
   cloudflared:
@@ -134,3 +104,40 @@ services:
     networks:
       - edge
       - apps
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    environment:
+      OAUTH2_PROXY_PROVIDER: github
+      OAUTH2_PROXY_CLIENT_ID: ${GITHUB_CLIENT_ID_PROD}
+      OAUTH2_PROXY_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET_PROD}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET_PROD}   # 32-byte base64
+      OAUTH2_PROXY_EMAIL_DOMAINS: '*'                            # or restrict (see below)
+      # Optional org/team restrictions:
+      # OAUTH2_PROXY_GITHUB_ORG: your-org
+      # OAUTH2_PROXY_GITHUB_TEAM: your-org:platform
+      OAUTH2_PROXY_UPSTREAMS: file:///dev/null
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_REDIRECT_URL: https://${OAUTH_URL}/oauth2/callback
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _oauth2_proxy_prod
+      OAUTH2_PROXY_WHITELIST_DOMAINS: ${OAUTH_WHITELIST_DOMAIN}
+      OAUTH2_PROXY_COOKIE_DOMAINS: ${OAUTH_WHITELIST_DOMAIN}
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_COOKIE_SAMESITE: none
+      # OAUTH2_PROXY_SCOPE: "read:org user:email"
+      #OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      # OAUTH2_PROXY_REDEEM_URL: 'https://${OAUTH_URL}/oauth2/token'
+      # OAUTH2_PROXY_PROFILE_URL: 'https://${OAUTH_URL}/oauth2/userInfo'
+      # OAUTH2_PROXY_LOGIN_URL: 'https://${OAUTH_URL}/oauth2/authorize'
+      LOG_LEVEL: debug
+    networks: [apps]
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.oauth2.rule=Host(`${OAUTH_URL}`) || PathPrefix(`/oauth2`)
+      - traefik.http.routers.oauth2.entrypoints=web
+      - traefik.http.services.oauth2.loadbalancer.server.port=4180
